@@ -35,15 +35,15 @@
 RED_PIN   = 17
 GREEN_PIN = 22
 BLUE_PIN  = 24
+LIGHT_EFFECT_BTN_PIN = 37    # pin12 --- button
+BRIGHTNESS_UP_BTN_PIN = 31
+BRIGHTNESS_DOWN_BTN_PIN = 36
 
 # Number of color changes per step (more is faster, less is slower).
 # You also can use 0.X floats.
 STEPS     = 1
 
 ###### END ######
-
-
-
 
 import os
 import sys
@@ -58,11 +58,54 @@ r = 255.0
 g = 0.0
 b = 0.0
 
-brightChanged = False
-abort = False
-state = True
-
 pi = pigpio.pi()
+
+def setup():
+	GPIO.setmode(GPIO.BOARD)       # Numbers GPIOs by physical location
+	#GPIO.setup(LedPin, GPIO.OUT)   # Set LedPin's mode is output
+	GPIO.setup(LIGHT_EFFECT_BTN_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)    # Set LIGHT_EFFECT_BTN_PIN's mode is input, and pull up to high level(3.3V)
+	#GPIO.output(LedPin, GPIO.HIGH) # Set LedPin high(+3.3V) to off led
+
+def incrementBtnStatus():
+	global BtnStatus
+	if BtnStatus == 4:
+		BtnStatus = 0
+	else:
+		BtnStatus = BtnStatus + 1
+
+def changeLightEffect(ev=None):
+	global BtnStatus
+	if BtnStatus == 0:
+		print 'State is 0: Off'
+		#set lights to black
+		setLights(RED_PIN, 0)
+		setLights(GREEN_PIN, 0)
+		setLights(BLUE_PIN, 0)
+	elif BtnStatus == 1:
+		print 'State is 1: White'
+		#set lights to white
+		setLights(RED_PIN, 255)
+		setLights(GREEN_PIN, 255)
+		setLights(BLUE_PIN, 255)
+	elif BtnStatus == 2:
+		print 'State is 2: Purple'
+		#set lights to purple
+		setLights(RED_PIN, 160)
+		setLights(GREEN_PIN, 32)
+		setLights(BLUE_PIN, 240)
+	elif BtnStatus == 3:
+		print 'State is 3: Pattern'
+		#set lights to pattern
+		while (BtnStatus == 3)
+			pattern()
+	incrementBtnStatus()
+	#global Led_status
+	#Led_status = not Led_status
+	#GPIO.output(LedPin, Led_status)  # switch led status(on-->off; off-->on)
+	#if Led_status == 1:
+	#	print 'led off...'
+	#else:
+	#	print '...led on'
 
 def updateColor(color, step):
 	color += step
@@ -74,11 +117,9 @@ def updateColor(color, step):
 		
 	return color
 
-
 def setLights(pin, brightness):
 	realBrightness = int(int(brightness) * (float(bright) / 255.0))
 	pi.set_PWM_dutycycle(pin, realBrightness)
-
 
 def getCh():
 	fd = sys.stdin.fileno()
@@ -91,7 +132,6 @@ def getCh():
 		termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 		
 	return ch
-
 
 def checkKey():
 	global bright
@@ -136,51 +176,51 @@ def checkKey():
 			abort = True
 			break
 
-start_new_thread(checkKey, ())
+#start_new_thread(checkKey, ())
 
+#print ("+ / - = Increase / Decrease brightness")
+#print ("p / r = Pause / Resume")
+#print ("c = Abort Program")
 
-print ("+ / - = Increase / Decrease brightness")
-print ("p / r = Pause / Resume")
-print ("c = Abort Program")
+def loop():
+	GPIO.add_event_detect(LIGHT_EFFECT_BTN_PIN, GPIO.FALLING, callback=changeLightEffect, bouncetime=200) # wait for falling and set bouncetime to prevent the callback function from being called multiple times when the button is pressed
+	GPIO.add_event_detect(BRIGHTNESS_UP_BTN_PIN, GPIO.FALLING, callback=brightnessUp, bouncetime=200) # wait for falling and set bouncetime to prevent the callback function from being called multiple times when the button is pressed
+	GPIO.add_event_detect(BRIGHTNESS_DOWN_BTN_PIN, GPIO.FALLING, callback=brightnessDown, bouncetime=200) # wait for falling and set bouncetime to prevent the callback function from being called multiple times when the button is pressed
+	while True:
+		time.sleep(1)   # Don't do anything
 
+def destroy():
+	#GPIO.output(LedPin, GPIO.HIGH)     # led off
+	GPIO.cleanup()                     # Release resource
 
-setLights(RED_PIN, r)
-setLights(GREEN_PIN, g)
-setLights(BLUE_PIN, b)
-
-
-while abort == False:
-	if state and not brightChanged:
-		if r == 255 and b == 0 and g < 255:
-			g = updateColor(g, STEPS)
-			setLights(GREEN_PIN, g)
-		
-		elif g == 255 and b == 0 and r > 0:
-			r = updateColor(r, -STEPS)
-			setLights(RED_PIN, r)
-		
-		elif r == 0 and g == 255 and b < 255:
-			b = updateColor(b, STEPS)
-			setLights(BLUE_PIN, b)
-		
-		elif r == 0 and b == 255 and g > 0:
-			g = updateColor(g, -STEPS)
-			setLights(GREEN_PIN, g)
-		
-		elif g == 0 and b == 255 and r < 255:
-			r = updateColor(r, STEPS)
-			setLights(RED_PIN, r)
-		
-		elif r == 255 and g == 0 and b > 0:
-			b = updateColor(b, -STEPS)
-			setLights(BLUE_PIN, b)
+def pattern():
+	if r == 255 and b == 0 and g < 255:
+		g = updateColor(g, STEPS)
+		setLights(GREEN_PIN, g)
 	
-print ("Aborting...")
+	elif g == 255 and b == 0 and r > 0:
+		r = updateColor(r, -STEPS)
+		setLights(RED_PIN, r)
+	
+	elif r == 0 and g == 255 and b < 255:
+		b = updateColor(b, STEPS)
+		setLights(BLUE_PIN, b)
+	
+	elif r == 0 and b == 255 and g > 0:
+		g = updateColor(g, -STEPS)
+		setLights(GREEN_PIN, g)
+	
+	elif g == 0 and b == 255 and r < 255:
+		r = updateColor(r, STEPS)
+		setLights(RED_PIN, r)
+	
+	elif r == 255 and g == 0 and b > 0:
+		b = updateColor(b, -STEPS)
+		setLights(BLUE_PIN, b)
 
-setLights(RED_PIN, 0)
-setLights(GREEN_PIN, 0)
-setLights(BLUE_PIN, 0)
-
-time.sleep(0.5)
-
-pi.stop()
+if __name__ == '__main__':     # Program start from here
+	setup()
+	try:
+		loop()
+	except KeyboardInterrupt:  # When 'Ctrl+C' is pressed, the child program destroy() will be  executed.
+		destroy()
