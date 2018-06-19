@@ -41,8 +41,8 @@ BRIGHTNESS_DOWN_BTN_PIN = 36
 
 # Number of color changes per step (more is faster, less is slower).
 # You also can use 0.X floats.
-STEPS     = 1
-
+STEPS     = 0.3
+IsPattern = False
 ###### END ######
 
 import os
@@ -51,6 +51,8 @@ import termios
 import tty
 import pigpio
 import time
+import RPi.GPIO as GPIO
+import subprocess
 from thread import start_new_thread
 
 bright = 255
@@ -60,22 +62,29 @@ b = 0.0
 
 pi = pigpio.pi()
 
+BtnStatus = 1
+proc = True
+
 def setup():
 	GPIO.setmode(GPIO.BOARD)       # Numbers GPIOs by physical location
-	#GPIO.setup(LedPin, GPIO.OUT)   # Set LedPin's mode is output
+	#GPIO.setup(LedPin, GPIO.OUT)   # Set LedPin's mode is outexceptput
 	GPIO.setup(LIGHT_EFFECT_BTN_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)    # Set LIGHT_EFFECT_BTN_PIN's mode is input, and pull up to high level(3.3V)
 	#GPIO.output(LedPin, GPIO.HIGH) # Set LedPin high(+3.3V) to off led
 
 def incrementBtnStatus():
 	global BtnStatus
-	if BtnStatus == 4:
+	if BtnStatus == 3:
 		BtnStatus = 0
 	else:
 		BtnStatus = BtnStatus + 1
 
 def changeLightEffect(ev=None):
 	global BtnStatus
+	global IsPattern
+	global proc
 	if BtnStatus == 0:
+                proc.kill()
+                IsPattern = False
 		print 'State is 0: Off'
 		#set lights to black
 		setLights(RED_PIN, 0)
@@ -96,8 +105,8 @@ def changeLightEffect(ev=None):
 	elif BtnStatus == 3:
 		print 'State is 3: Pattern'
 		#set lights to pattern
-		while (BtnStatus == 3)
-			pattern()
+		IsPattern = True
+		proc = subprocess.Popen(['python', 'fading.py'])
 	incrementBtnStatus()
 	#global Led_status
 	#Led_status = not Led_status
@@ -176,7 +185,7 @@ def checkKey():
 			abort = True
 			break
 
-#start_new_thread(checkKey, ())
+#start_new_thread(checkKey,  ())
 
 #print ("+ / - = Increase / Decrease brightness")
 #print ("p / r = Pause / Resume")
@@ -184,8 +193,8 @@ def checkKey():
 
 def loop():
 	GPIO.add_event_detect(LIGHT_EFFECT_BTN_PIN, GPIO.FALLING, callback=changeLightEffect, bouncetime=200) # wait for falling and set bouncetime to prevent the callback function from being called multiple times when the button is pressed
-	GPIO.add_event_detect(BRIGHTNESS_UP_BTN_PIN, GPIO.FALLING, callback=brightnessUp, bouncetime=200) # wait for falling and set bouncetime to prevent the callback function from being called multiple times when the button is pressed
-	GPIO.add_event_detect(BRIGHTNESS_DOWN_BTN_PIN, GPIO.FALLING, callback=brightnessDown, bouncetime=200) # wait for falling and set bouncetime to prevent the callback function from being called multiple times when the button is pressed
+	#GPIO.add_event_detect(BRIGHTNESS_UP_BTN_PIN, GPIO.FALLING, callback=brightnessUp, bouncetime=200) # wait for falling and set bouncetime to prevent the callback function from being called multiple times when the button is pressed
+	#GPIO.add_event_detect(BRIGHTNESS_DOWN_BTN_PIN, GPIO.FALLING, callback=brightnessDown, bouncetime=200) # wait for falling and set bouncetime to prevent the callback function from being called multiple times when the button is pressed
 	while True:
 		time.sleep(1)   # Don't do anything
 
@@ -194,6 +203,12 @@ def destroy():
 	GPIO.cleanup()                     # Release resource
 
 def pattern():
+    global IsPattern
+    global LIGHT_EFFECT_BTN_PIN
+    while True:
+        global r
+        global b
+        global g
 	if r == 255 and b == 0 and g < 255:
 		g = updateColor(g, STEPS)
 		setLights(GREEN_PIN, g)
@@ -220,6 +235,9 @@ def pattern():
 
 if __name__ == '__main__':     # Program start from here
 	setup()
+	setLights(BLUE_PIN, r)
+        setLights(BLUE_PIN, g)
+        setLights(BLUE_PIN, b)
 	try:
 		loop()
 	except KeyboardInterrupt:  # When 'Ctrl+C' is pressed, the child program destroy() will be  executed.
