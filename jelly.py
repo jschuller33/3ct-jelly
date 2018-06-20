@@ -3,13 +3,13 @@
 
 #
  # -----------------------------------------------------
- # File        fading.py
- # Authors     David Ordnung
+ # File        jelly.py
+ # Authors     3ct & Agia
  # License     GPLv3
- # Web         http://dordnung.de/raspberrypi-ledstrip/
+ # Web         http://
  # -----------------------------------------------------
  # 
- # Copyright (C) 2014-2017 David Ordnung
+ # Copyright (C) 2014-2018 3ct & Agia
  # 
  # This program is free software: you can redistribute it and/or modify
  # it under the terms of the GNU General Public License as published by
@@ -41,8 +41,8 @@ BRIGHTNESS_DOWN_BTN_PIN = 36
 
 # Number of color changes per step (more is faster, less is slower).
 # You also can use 0.X floats.
-STEPS     = 1
-
+STEPS     = 0.3
+IsPattern = False
 ###### END ######
 
 import os
@@ -51,6 +51,8 @@ import termios
 import tty
 import pigpio
 import time
+import RPi.GPIO as GPIO
+import subprocess
 from thread import start_new_thread
 
 bright = 255
@@ -60,22 +62,51 @@ b = 0.0
 
 pi = pigpio.pi()
 
+BtnStatus = 1
+proc = True
+
 def setup():
 	GPIO.setmode(GPIO.BOARD)       # Numbers GPIOs by physical location
-	#GPIO.setup(LedPin, GPIO.OUT)   # Set LedPin's mode is output
-	GPIO.setup(LIGHT_EFFECT_BTN_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)    # Set LIGHT_EFFECT_BTN_PIN's mode is input, and pull up to high level(3.3V)
+	#GPIO.setup(LedPin, GPIO.OUT)   # Set LedPin's mode is outexceptput
+	GPIO.setup(LIGHT_EFFECT_BTN_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+	GPIO.setup(BRIGHTNESS_UP_BTN_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+	GPIO.setup(BRIGHTNESS_DOWN_BTN_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)    # Set LIGHT_EFFECT_BTN_PIN's mode is input, and pull up to high level(3.3V)
 	#GPIO.output(LedPin, GPIO.HIGH) # Set LedPin high(+3.3V) to off led
 
 def incrementBtnStatus():
 	global BtnStatus
-	if BtnStatus == 4:
+	if BtnStatus == 3:
 		BtnStatus = 0
 	else:
 		BtnStatus = BtnStatus + 1
 
+def changeBrightness(brightnessUp):
+    global bright
+    print 'changing brightness...'
+    if (bright < 1 and not brightnessUp) or (bright > 255 and brightnessUp):
+        return
+    
+    global r
+    global g
+    global b
+    
+    if brightnessUp:
+        bright += 51
+    else:
+        bright -= 51
+        
+    setLights(RED_PIN, r)
+    setLights(GREEN_PIN, g)
+    setLights(BLUE_PIN, b)
+    print 'Brightness: ' + str(bright)
+
 def changeLightEffect(ev=None):
 	global BtnStatus
+	global IsPattern
+	global proc
 	if BtnStatus == 0:
+                proc.kill()
+                IsPattern = False
 		print 'State is 0: Off'
 		#set lights to black
 		setLights(RED_PIN, 0)
@@ -96,8 +127,8 @@ def changeLightEffect(ev=None):
 	elif BtnStatus == 3:
 		print 'State is 3: Pattern'
 		#set lights to pattern
-		while (BtnStatus == 3)
-			pattern()
+		IsPattern = True
+		proc = subprocess.Popen(['python', 'fading.py'])
 	incrementBtnStatus()
 	#global Led_status
 	#Led_status = not Led_status
@@ -118,8 +149,23 @@ def updateColor(color, step):
 	return color
 
 def setLights(pin, brightness):
+        global r
+        global g
+        global b
+        if pin == RED_PIN:
+            r = brightness
+        elif pin == GREEN_PIN:
+            g = brightness
+        elif pin == BLUE_PIN:
+            b = brightness
 	realBrightness = int(int(brightness) * (float(bright) / 255.0))
 	pi.set_PWM_dutycycle(pin, realBrightness)
+
+def brightnessUp(self):
+    changeBrightness(True)
+    
+def brightnessDown(self):
+    changeBrightness(False)
 
 def getCh():
 	fd = sys.stdin.fileno()
@@ -176,7 +222,7 @@ def checkKey():
 			abort = True
 			break
 
-#start_new_thread(checkKey, ())
+#start_new_thread(checkKey,  ())
 
 #print ("+ / - = Increase / Decrease brightness")
 #print ("p / r = Pause / Resume")
@@ -194,6 +240,12 @@ def destroy():
 	GPIO.cleanup()                     # Release resource
 
 def pattern():
+    global IsPattern
+    global LIGHT_EFFECT_BTN_PIN
+    while True:
+        global r
+        global b
+        global g
 	if r == 255 and b == 0 and g < 255:
 		g = updateColor(g, STEPS)
 		setLights(GREEN_PIN, g)
@@ -220,6 +272,9 @@ def pattern():
 
 if __name__ == '__main__':     # Program start from here
 	setup()
+	setLights(BLUE_PIN, r)
+        setLights(BLUE_PIN, g)
+        setLights(BLUE_PIN, b)
 	try:
 		loop()
 	except KeyboardInterrupt:  # When 'Ctrl+C' is pressed, the child program destroy() will be  executed.
