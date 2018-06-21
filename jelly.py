@@ -75,7 +75,7 @@ def setup():
 
 def incrementBtnStatus():
 	global BtnStatus
-	if BtnStatus == 3:
+	if BtnStatus == 4:
 		BtnStatus = 0
 	else:
 		BtnStatus = BtnStatus + 1
@@ -83,7 +83,7 @@ def incrementBtnStatus():
 def changeBrightness(brightnessUp):
     global bright
     print 'changing brightness...'
-    if (bright < 1 and not brightnessUp) or (bright > 255 and brightnessUp):
+    if (bright < 2 and not brightnessUp) or (bright > 254 and brightnessUp):
         return
     
     global r
@@ -91,9 +91,9 @@ def changeBrightness(brightnessUp):
     global b
     
     if brightnessUp:
-        bright += 51
+        bright += 50.8
     else:
-        bright -= 51
+        bright -= 50.8
         
     setLights(RED_PIN, r)
     setLights(GREEN_PIN, g)
@@ -103,9 +103,10 @@ def changeBrightness(brightnessUp):
 def changeLightEffect(ev=None):
 	global BtnStatus
 	global IsPattern
-	global proc
+	global procFast
+	global procSlow
 	if BtnStatus == 0:
-                proc.kill()
+                procFast.kill()
                 IsPattern = False
 		print 'State is 0: Off'
 		#set lights to black
@@ -125,10 +126,16 @@ def changeLightEffect(ev=None):
 		setLights(GREEN_PIN, 32)
 		setLights(BLUE_PIN, 240)
 	elif BtnStatus == 3:
-		print 'State is 3: Pattern'
+		print 'State is 3: Pattern Slow'
 		#set lights to pattern
 		IsPattern = True
-		proc = subprocess.Popen(['python', 'fading.py'])
+		procSlow = subprocess.Popen(['python', 'fading-slow.py'])
+        elif BtnStatus == 4:
+		print 'State is 4: Pattern Fast'
+		#set lights to pattern
+		IsPattern = True
+		procSlow.kill()
+		procFast = subprocess.Popen(['python', 'fading-fast.py'])
 	incrementBtnStatus()
 	#global Led_status
 	#Led_status = not Led_status
